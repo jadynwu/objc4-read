@@ -39,6 +39,7 @@ typedef struct objc_class *Class;
 
 /// Represents an instance of a class.
 struct objc_object {
+    //class指针
     Class isa  OBJC_ISA_AVAILABILITY;
 };
 

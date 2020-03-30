@@ -56,6 +56,7 @@ namespace {
 };
 
 
+//联合体，比struct更优化内存空间
 union isa_t 
 {
     isa_t() { }
@@ -101,14 +102,14 @@ union isa_t
 #   define ISA_MAGIC_VALUE 0x001d800000000001ULL
     struct {
         uintptr_t indexed           : 1;
-        uintptr_t has_assoc         : 1;
-        uintptr_t has_cxx_dtor      : 1;
-        uintptr_t shiftcls          : 44; // MACH_VM_MAX_ADDRESS 0x7fffffe00000
-        uintptr_t magic             : 6;
-        uintptr_t weakly_referenced : 1;
-        uintptr_t deallocating      : 1;
-        uintptr_t has_sidetable_rc  : 1;
-        uintptr_t extra_rc          : 8;
+        uintptr_t has_assoc         : 1;//标记是否有关联对象
+        uintptr_t has_cxx_dtor      : 1;//标记是否有析构函数
+        uintptr_t shiftcls          : 44;//标记class/meta-class的内存地址信息 // MACH_VM_MAX_ADDRESS 0x7fffffe00000
+        uintptr_t magic             : 6;//标记是否初始化完成
+        uintptr_t weakly_referenced : 1;//标记是否被weak指针指向
+        uintptr_t deallocating      : 1;//标记是否正在释放
+        uintptr_t has_sidetable_rc  : 1;//标记extra_rc参数能否存的下引用计数，如果存不下就存在全局的sidetable里
+        uintptr_t extra_rc          : 8;//存储引用计数
 #       define RC_ONE   (1ULL<<56)
 #       define RC_HALF  (1ULL<<7)
     };
@@ -129,49 +130,50 @@ private:
     isa_t isa;
 
 public:
-
-    // ISA() assumes this is NOT a tagged pointer object
+    //表示这不是一个tagged pointer对象
     Class ISA();
-
-    // getIsa() allows this to be a tagged pointer object
+    //表示这是一个tagged pointer对象
     Class getIsa();
 
-    // initIsa() should be used to init the isa of new objects only.
-    // If this object already has an isa, use changeIsa() for correctness.
-    // initInstanceIsa(): objects with no custom RR/AWZ
-    // initClassIsa(): class objects
-    // initProtocolIsa(): protocol objects
-    // initIsa(): other objects
+    //应该只被用来初始化新对象的isa
     void initIsa(Class cls /*indexed=false*/);
+    //用来初始化一个类对象的isa
     void initClassIsa(Class cls /*indexed=maybe*/);
+    //用来初始化一个协议的isa
     void initProtocolIsa(Class cls /*indexed=maybe*/);
+    //用来初始化一个实例变量的isa，是否有析构甘薯，包含-.cxx_destruct实现
     void initInstanceIsa(Class cls, bool hasCxxDtor);
 
-    // changeIsa() should be used to change the isa of existing objects.
-    // If this is a new object, use initIsa() for performance.
+    //如果这个对象已经有isa了，使用changeIsa()方法更改已存的isa
     Class changeIsa(Class newCls);
 
+    
     bool hasIndexedIsa();
+    //是否是Tagged Pointer
     bool isTaggedPointer();
+    //是否是class
     bool isClass();
 
-    // object may have associated objects?
+    //是否有关联对象
     bool hasAssociatedObjects();
+    //设置关联对象
     void setHasAssociatedObjects();
 
-    // object may be weakly referenced?
+    //是否有被弱引用
     bool isWeaklyReferenced();
+    //设置弱引用
     void setWeaklyReferenced_nolock();
 
-    // object may have -.cxx_destruct implementation?
+    //对象是否有析构函数，包含-.cxx_destruct实现
     bool hasCxxDtor();
 
-    // Optimized calls to retain/release methods
+    
+    //retain/release方法的声明函数
     id retain();
     void release();
     id autorelease();
 
-    // Implementations of retain/release methods
+    //retain/release的方法实现
     id rootRetain();
     bool rootRelease();
     id rootAutorelease();
@@ -179,7 +181,7 @@ public:
     bool rootReleaseShouldDealloc();
     uintptr_t rootRetainCount();
 
-    // Implementation of dealloc methods
+    //销毁对象相关
     bool rootIsDeallocating();
     void clearDeallocating();
     void rootDealloc();
